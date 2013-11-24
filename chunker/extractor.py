@@ -1,3 +1,4 @@
+import logging
 import json
 import nltk
 import sys
@@ -6,6 +7,8 @@ import traceback
 from nltk import FreqDist
 from nltk.chunk.util import conlltags2tree
 from nltk.corpus import conll2000
+
+log = logging.getLogger(__name__)
 
 class ChunkParser(nltk.ChunkParserI): 
 	def __init__(self, train_sents):
@@ -22,12 +25,12 @@ class ChunkParser(nltk.ChunkParserI):
 		return conlltags2tree(conlltags)
 
 # Train and init the chunker
-print '-- init and training chunker --'
+log.info('-- init and training chunker --')
 train_sents = conll2000.chunked_sents('train.txt', chunk_types=['NP'])
 test_sents = conll2000.chunked_sents('test.txt', chunk_types=['NP']) 
 NPChunker = ChunkParser(train_sents)
 NPChunker.evaluate(test_sents)
-print '-- Done --'
+log.info('-- Done --')
 
 def pos_tagger(tokens):
 	# NLTK POS tagger
@@ -77,25 +80,23 @@ def populate(leaves, articleId, redis, gram):
 		redis.lpush('chunk:%s:%s'%(gram, sentence), article)
 
 def populateUnigram(leaves, articleId, redis):
-	print 'Unigram / Leaves: %s - Article: %s' % (leaves, articleId)
+	log.debug('Unigram / Leaves: %s - Article: %s' % (leaves, articleId))
 	populate(leaves, articleId, redis, 'unigram')
 
 def populateBigram(leaves, articleId, redis):
-	print 'Bigram / Leaves: %s - Article: %s' % (leaves, articleId)
+	log.debug('Bigram / Leaves: %s - Article: %s' % (leaves, articleId))
 	populate(leaves, articleId, redis, 'bigram')
 
 def populateNgram(leaves, articleId, redis):
-	print 'Ngram / Leaves: %s - Article: %s' % (leaves, articleId)
+	log.debug('Ngram / Leaves: %s - Article: %s' % (leaves, articleId))
 	populate(leaves, articleId, redis, 'ngram')
 
 def populateTrainedgram(leaves, articleId, redis):
-	print 'Trainedgram / Leaves: %s - Article: %s' % (leaves, articleId)
+	log.debug('Trainedgram / Leaves: %s - Article: %s' % (leaves, articleId))
 	populate(leaves, articleId, redis, 'trainedgram')
 
 def chunking(tags, articleId, redis):
 	for sentence in tags:
-		# print '-------------Sentence----------------'	
-		# print sentence
 		traverse(unigramNP(sentence), articleId, redis, 'unigram')
 		traverse(bigramNP(sentence), articleId, redis, 'bigram')
 		traverse(ngramNP(sentence), articleId, redis, 'ngram')
@@ -109,7 +110,6 @@ def traverse(t, articleId, redis, chunk):
 		return
 	else:
 		if t.node == 'NP':
-			#print t.leaves()
 			cleaned = json.loads(json.dumps(t.leaves()))
 			if chunk == 'unigram':
 				populateUnigram(cleaned, articleId, redis)
@@ -127,18 +127,9 @@ def traverse(t, articleId, redis, chunk):
 def extract_keywords(task, redis):
 	articleId = task['id']
 	rawtext = nltk.clean_html(task['contents'])
-	#print 'Cleaned: %s' % (rawtext)
 	sentences = sentence_segmenter(rawtext)
-	# print 'Sentences: %s' % (sentences)
 	tokens = tokenize(sentences)
-	#print '------------Freq-----------'
-	#fdist = FreqDist()
-	#for word in rawtext.split():
-	#	fdist.inc(word.lower())
-	#print fdist
-	# print 'Tokens: %s' % (tokens)
 	tags = pos_tagger(tokens)
-	# print 'Tags: %s' % (tags)
 	chunking(tags, articleId, redis)
 
 def redis_mode(redis):
@@ -147,13 +138,12 @@ def redis_mode(redis):
 			task = redis.blpop('queue:chunker', 10)
 			if task != None:
 				raw = json.loads(task[1])
-				# print 'JSON: %s' % (raw)
 				if not raw['language'] or not raw['language'].startswith('en'):
 					continue
 				redis.sadd('articles', "article:%s" %(raw['id']))
 				extract_keywords(raw, redis)
 				redis.rpush('queue:nlp',"%s"%(raw['id']))
-				print 'Pushed to queue:nlp'
+				log.info("Pushed %s to queue:nlp"%(raw['id']))
 		except KeyboardInterrupt:
 			sys.exit(0)
 		except:

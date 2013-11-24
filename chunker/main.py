@@ -1,4 +1,6 @@
 import locale
+import logging
+import logging.config
 import optparse
 import redis
 import sys
@@ -15,14 +17,15 @@ from chunker.extractor import redis_mode
 def parse_cmdline():
 	usage = '%s [OPTIONS]' % (sys.argv[0])
 	parser = optparse.OptionParser(usage, version='The Pieuvre Chunker ' + VERSION) 
-	parser.add_option('--verbose', action='store_true', dest='verbose',
-		help='print verbose information')
 	parser.add_option('--redis-url', type='string', dest='redis_url',
 		help='consuming the feeder queue from the local Redis')
 	parser.add_option('--redis-host', type='string', dest='redis_host',
 		help='consuming the feeder queue from the local Redis (host)')
 	parser.add_option('--redis-port', type='int', dest='redis_port',
 		help='consuming the feeder queue from the local Redis (port)')
+	parser.add_option('--logging-config', type='string', dest='logging_config',
+		help='Logging configuration path')
+
 
 	options, args = parser.parse_args()
 
@@ -35,11 +38,6 @@ def parse_cmdline():
 			parser.error('Redis url is malformed: host/port='+netloc)
 		redis_host_port = netloc.split(':')
 		if len (redis_host_port) != 2:
-			for z in redis_host_port:
-				print "arg=" + z
-			for n in urlparse(options.redis_url):
-				print 'part ' + n 
-			print 'base=' + options.redis_url
 			parser.error('Expecting a url for redis, like redis://host.domain.fr:456/')
 		options.redis_host = redis_host_port[0]
 		options.redis_port = redis_host_port[1]
@@ -61,6 +59,10 @@ def main():
 	"""Starting the Pieuvre feeder"""
 	locale.setlocale(locale.LC_ALL, '')
 	options, args = parse_cmdline()
+	if options.logging_config:
+		logging.config.fileConfig(options.logging_config, disable_existing_loggers=False)
+	else:
+		logging.basicConfig(level=logging.INFO)
 	if options.redis_host:
 		r = redis.StrictRedis(host=options.redis_host, port=options.redis_port, db=0)
 		r.sadd('queues', 'chunker')
