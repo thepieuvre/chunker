@@ -71,8 +71,8 @@ def populate(leaves, articleId, redis, gram):
 		word = '%s'%(leave[0])
 		typed = '%s'%(leave[1])
 		words.append(word)
-		redis.sadd('words', 'word:%s'%(word))
-		redis.hsetnx('word:%s'%(word), 'type', typed)
+		#redis.sadd('words', 'word:%s'%(word))
+		#redis.hsetnx('word:%s'%(word), 'type', typed)
 	sentence = ' '.join(words)
 	res = redis.zincrby('%s:%s'%(article, gram), sentence, 1)
 	if res != 1.0:
@@ -97,10 +97,10 @@ def populateTrainedgram(leaves, articleId, redis):
 
 def chunking(tags, articleId, redis):
 	for sentence in tags:
-		traverse(unigramNP(sentence), articleId, redis, 'unigram')
-		traverse(bigramNP(sentence), articleId, redis, 'bigram')
+		#traverse(unigramNP(sentence), articleId, redis, 'unigram')
+		#traverse(bigramNP(sentence), articleId, redis, 'bigram')
 		traverse(ngramNP(sentence), articleId, redis, 'ngram')
-		traverse(NPChunker.parse(sentence), articleId, redis, 'trainedgram')
+		#traverse(NPChunker.parse(sentence), articleId, redis, 'trainedgram')
 
 def traverse(t, articleId, redis, chunk):
 	# a tree traversal function for extracting NP chunks in the parsed tree
